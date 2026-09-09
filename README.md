@@ -6,13 +6,15 @@ Third-person combat action. Fight through enemy pressure, master combos and char
 
 ## Download
 
-**[Download the Windows launcher](https://github.com/HyperlinksSpace/threedensity/releases/latest/download/ThreeDensitySetup.exe)**
+**[Download the Windows launcher](https://github.com/LqnPeraL/threedensity/releases/latest/download/ThreeDensitySetup.exe)**
 
 The launcher installs the game, creates a desktop shortcut, and **checks GitHub for updates on every launch** before starting.
 
-Game page: **[threedensity.hyperlinks.space](https://threedensity.hyperlinks.space/)**
+Game page: **[lqnpereal.github.io/threedensity](https://lqnpereal.github.io/threedensity/)**
 
-Portable ZIP (optional): [ThreeDensity-Win64.zip](https://github.com/HyperlinksSpace/threedensity/releases/latest/download/ThreeDensity-Win64.zip)
+Portable ZIP (optional): [ThreeDensity-Win64.zip](https://github.com/LqnPeraL/threedensity/releases/latest/download/ThreeDensity-Win64.zip)
+
+Every push to `main` deploys the site (GitHub Pages) and publishes a release you can download to test that commit.
 
 ## In-game
 
@@ -47,6 +49,8 @@ Portable ZIP (optional): [ThreeDensity-Win64.zip](https://github.com/HyperlinksS
 ## Build from Source
 
 Open `threedensity.uproject`, or package with `RunUAT BuildCookRun`.
+
+To attach a playable Win64 build to the auto-release for a commit, put the cooked zip at `release-assets/ThreeDensity-Win64.zip` (see `scripts/package-win64.ps1`) before pushing, or upload it onto the release after CI finishes.
 
 ## License
 

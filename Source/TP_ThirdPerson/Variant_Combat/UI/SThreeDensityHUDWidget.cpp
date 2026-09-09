@@ -2,6 +2,7 @@
 
 #include "SThreeDensityHUDWidget.h"
 #include "Variant_Combat/CombatPlayerController.h"
+#include "Variant_Combat/CombatCharacter.h"
 #include "ThreeDensityGameUserSettings.h"
 #include "ThreeDensityGameInstance.h"
 #include "Widgets/Layout/SBorder.h"
@@ -118,6 +119,14 @@ void SThreeDensityHUDWidget::Construct(const FArguments& InArgs)
 			.Font(FCoreStyle::GetDefaultFontStyle("Bold", 12))
 			.ColorAndOpacity(FLinearColor(0.85f, 0.85f, 0.85f, 0.55f))
 		]
+		+ SOverlay::Slot().VAlign(VAlign_Bottom).HAlign(HAlign_Left).Padding(28, 0, 0, 28)
+		[
+			SNew(SBox)
+			.Visibility(this, &SThreeDensityHUDWidget::GetHealthBarVisibility)
+			[
+				BuildHealthBar()
+			]
+		]
 		+ SOverlay::Slot()
 		[
 			SNew(SBorder)
@@ -129,6 +138,70 @@ void SThreeDensityHUDWidget::Construct(const FArguments& InArgs)
 			]
 		]
 	];
+}
+
+TSharedRef<SWidget> SThreeDensityHUDWidget::BuildHealthBar()
+{
+	const float TrackWidth = 232.0f;
+
+	return SNew(SBox)
+		.WidthOverride(260)
+		[
+			SNew(SBorder)
+			.BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
+			.BorderBackgroundColor(FLinearColor(0.02f, 0.025f, 0.03f, 0.82f))
+			.Padding(FMargin(14, 10))
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot().AutoHeight().Padding(0, 0, 0, 6)
+				[
+					SNew(SHorizontalBox)
+					+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center)
+					[
+						SNew(STextBlock)
+						.Text(FText::FromString(TEXT("HP")))
+						.Font(FCoreStyle::GetDefaultFontStyle("Bold", 12))
+						.ColorAndOpacity(Ember)
+					]
+					+ SHorizontalBox::Slot().FillWidth(1.f).HAlign(HAlign_Right).VAlign(VAlign_Center)
+					[
+						SNew(STextBlock)
+						.Text(this, &SThreeDensityHUDWidget::GetHealthLabel)
+						.Font(FCoreStyle::GetDefaultFontStyle("Bold", 13))
+						.ColorAndOpacity(Steel)
+					]
+				]
+				+ SVerticalBox::Slot().AutoHeight()
+				[
+					SNew(SBox)
+					.HeightOverride(14)
+					.WidthOverride(TrackWidth)
+					[
+						SNew(SOverlay)
+						+ SOverlay::Slot()
+						[
+							SNew(SImage)
+							.Image(FCoreStyle::Get().GetBrush("WhiteBrush"))
+							.ColorAndOpacity(FLinearColor(0.08f, 0.09f, 0.1f, 1.f))
+						]
+						+ SOverlay::Slot().HAlign(HAlign_Left)
+						[
+							SNew(SBox)
+							.WidthOverride_Lambda([this, TrackWidth]() -> FOptionalSize
+							{
+								const float Percent = GetHealthPercent().Get(0.0f);
+								return TrackWidth * FMath::Clamp(Percent, 0.0f, 1.0f);
+							})
+							[
+								SNew(SImage)
+								.Image(FCoreStyle::Get().GetBrush("WhiteBrush"))
+								.ColorAndOpacity(Ember)
+							]
+						]
+					]
+				]
+			]
+		];
 }
 
 void SThreeDensityHUDWidget::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
@@ -565,6 +638,18 @@ EVisibility SThreeDensityHUDWidget::GetHintVisibility() const
 	return EVisibility::HitTestInvisible;
 }
 
+EVisibility SThreeDensityHUDWidget::GetHealthBarVisibility() const
+{
+	const ACombatPlayerController* PC = Owner.Get();
+	if (!PC || PC->IsPauseMenuOpen())
+	{
+		return EVisibility::Collapsed;
+	}
+
+	const ACombatCharacter* Character = Cast<ACombatCharacter>(PC->GetPawn());
+	return Character ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+}
+
 EVisibility SThreeDensityHUDWidget::GetControlsVisibility() const
 {
 	const ACombatPlayerController* PC = Owner.Get();
@@ -581,6 +666,27 @@ FText SThreeDensityHUDWidget::GetTipText() const
 {
 	const ACombatPlayerController* PC = Owner.Get();
 	return PC ? PC->GetCurrentTipText() : FText::GetEmpty();
+}
+
+FText SThreeDensityHUDWidget::GetHealthLabel() const
+{
+	const ACombatPlayerController* PC = Owner.Get();
+	const ACombatCharacter* Character = PC ? Cast<ACombatCharacter>(PC->GetPawn()) : nullptr;
+	if (!Character)
+	{
+		return FText::GetEmpty();
+	}
+
+	const int32 Current = FMath::Max(0, FMath::CeilToInt(Character->GetCurrentHP()));
+	const int32 Max = FMath::Max(1, FMath::CeilToInt(Character->GetMaxHP()));
+	return FText::FromString(FString::Printf(TEXT("%d / %d"), Current, Max));
+}
+
+TOptional<float> SThreeDensityHUDWidget::GetHealthPercent() const
+{
+	const ACombatPlayerController* PC = Owner.Get();
+	const ACombatCharacter* Character = PC ? Cast<ACombatCharacter>(PC->GetPawn()) : nullptr;
+	return Character ? Character->GetHPPercent() : 0.0f;
 }
 
 FText SThreeDensityHUDWidget::GetHardwareText() const

@@ -23,9 +23,9 @@ internal static class Program
 
 public sealed class LauncherForm : Form
 {
-    const string ApiUrl = "https://api.github.com/repos/HyperlinksSpace/threedensity/releases/latest";
-    const string FallbackZip = "https://github.com/HyperlinksSpace/threedensity/releases/latest/download/ThreeDensity-Win64.zip";
-    const string FallbackSetup = "https://github.com/HyperlinksSpace/threedensity/releases/latest/download/ThreeDensitySetup.exe";
+    const string ApiUrl = "https://api.github.com/repos/LqnPeraL/threedensity/releases/latest";
+    const string FallbackZip = "https://github.com/LqnPeraL/threedensity/releases/latest/download/ThreeDensity-Win64.zip";
+    const string FallbackSetup = "https://github.com/LqnPeraL/threedensity/releases/latest/download/ThreeDensitySetup.exe";
     const string LauncherFileName = "ThreeDensityLauncher.exe";
 
     static readonly Color Void = Color.FromArgb(7, 7, 8);

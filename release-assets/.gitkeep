@@ -1,0 +1,2 @@
+# Place ThreeDensity-Win64.zip here before pushing to attach your cooked build to the auto-release.
+# Generate it with:  pwsh ./scripts/package-win64.ps1

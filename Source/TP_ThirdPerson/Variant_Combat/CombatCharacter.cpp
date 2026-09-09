@@ -210,10 +210,14 @@ void ACombatCharacter::ResetHP()
 	// reset the current HP total
 	CurrentHP = MaxHP;
 
-	// update the life bar
-	if (LifeBarWidget)
+	UpdateLifeBarDisplay();
+}
+
+void ACombatCharacter::UpdateLifeBarDisplay()
+{
+	if (LifeBarWidget && MaxHP > 0.0f)
 	{
-		LifeBarWidget->SetLifePercentage(1.0f);
+		LifeBarWidget->SetLifePercentage(FMath::Clamp(CurrentHP / MaxHP, 0.0f, 1.0f));
 	}
 }
 
@@ -462,7 +466,13 @@ void ACombatCharacter::HandleDeath()
 
 void ACombatCharacter::ApplyHealing(float Healing, AActor* Healer)
 {
-	// stub
+	if (Healing <= 0.0f || CurrentHP <= 0.0f || CurrentHP >= MaxHP)
+	{
+		return;
+	}
+
+	CurrentHP = FMath::Min(MaxHP, CurrentHP + Healing);
+	UpdateLifeBarDisplay();
 }
 
 void ACombatCharacter::NotifyDanger(const FVector& DangerLocation, AActor* DangerSource)
@@ -486,6 +496,7 @@ float ACombatCharacter::TakeDamage(float Damage, struct FDamageEvent const& Dama
 
 	// reduce the current HP
 	CurrentHP -= Damage;
+	LastDamageWorldTime = GetWorld()->GetTimeSeconds();
 
 	// have we run out of HP?
 	if (CurrentHP <= 0.0f)
@@ -495,11 +506,7 @@ float ACombatCharacter::TakeDamage(float Damage, struct FDamageEvent const& Dama
 	}
 	else
 	{
-		// update the life bar
-		if (LifeBarWidget)
-		{
-			LifeBarWidget->SetLifePercentage(CurrentHP / MaxHP);
-		}
+		UpdateLifeBarDisplay();
 
 		// enable partial ragdoll physics, but keep the pelvis vertical
 		GetMesh()->SetPhysicsBlendWeight(0.5f);
@@ -544,6 +551,8 @@ void ACombatCharacter::BeginPlay()
 
 	// reset HP to maximum
 	ResetHP();
+
+	LastDamageWorldTime = GetWorld()->GetTimeSeconds();
 }
 
 void ACombatCharacter::Tick(float DeltaSeconds)
@@ -557,6 +566,17 @@ void ACombatCharacter::Tick(float DeltaSeconds)
 			DesiredCameraDistance,
 			DeltaSeconds,
 			ZoomInterpSpeed);
+	}
+
+	// Out-of-combat regen: after HealthRegenDelay with no damage, restore ~3% MaxHP / sec
+	if (CurrentHP > 0.0f && CurrentHP < MaxHP && MaxHP > 0.0f && HealthRegenPercentPerSecond > 0.0f)
+	{
+		const float TimeSinceDamage = GetWorld()->GetTimeSeconds() - LastDamageWorldTime;
+		if (TimeSinceDamage >= HealthRegenDelay)
+		{
+			CurrentHP = FMath::Min(MaxHP, CurrentHP + (MaxHP * HealthRegenPercentPerSecond * DeltaSeconds));
+			UpdateLifeBarDisplay();
+		}
 	}
 }
 
@@ -598,6 +618,12 @@ void ACombatCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		// Camera Side Toggle
 		EnhancedInputComponent->BindAction(ToggleCameraAction, ETriggerEvent::Triggered, this, &ACombatCharacter::ToggleCamera);
 	}
+
+	// Jump — Space / gamepad A (IMC_Combat has no IA_Jump mapping; bind keys like zoom)
+	PlayerInputComponent->BindKey(EKeys::SpaceBar, IE_Pressed, this, &ACharacter::Jump);
+	PlayerInputComponent->BindKey(EKeys::SpaceBar, IE_Released, this, &ACharacter::StopJumping);
+	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Pressed, this, &ACharacter::Jump);
+	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Released, this, &ACharacter::StopJumping);
 
 	// Zoom — mouse wheel + keyboard (works alongside Enhanced Input)
 	PlayerInputComponent->BindAxisKey(EKeys::MouseWheelAxis, this, &ACombatCharacter::ZoomAxis);

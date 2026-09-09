@@ -81,6 +81,17 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category="Damage")
 	float CurrentHP = 0.0f;
 
+	/** Seconds without damage before HP starts regenerating */
+	UPROPERTY(EditAnywhere, Category="Damage|Regen", meta = (ClampMin = 0, ClampMax = 120, Units = "s"))
+	float HealthRegenDelay = 30.0f;
+
+	/** Fraction of MaxHP restored each second while regenerating */
+	UPROPERTY(EditAnywhere, Category="Damage|Regen", meta = (ClampMin = 0, ClampMax = 1))
+	float HealthRegenPercentPerSecond = 0.03f;
+
+	/** World time when the character last took damage */
+	float LastDamageWorldTime = 0.0f;
+
 	/** Life bar widget fill color */
 	UPROPERTY(EditAnywhere, Category="Damage")
 	FLinearColor LifeBarColor;
@@ -279,6 +290,9 @@ protected:
 	/** Resets the character's current HP to maximum */
 	void ResetHP();
 
+	/** Syncs world / HUD life bars to CurrentHP */
+	void UpdateLifeBarDisplay();
+
 	/** Performs a combo attack */
 	void ComboAttack();
 
@@ -362,6 +376,11 @@ protected:
 	virtual void NotifyControllerChanged() override;
 
 public:
+
+	/** Current / max HP for HUD */
+	float GetCurrentHP() const { return CurrentHP; }
+	float GetMaxHP() const { return MaxHP; }
+	float GetHPPercent() const { return MaxHP > 0.0f ? FMath::Clamp(CurrentHP / MaxHP, 0.0f, 1.0f) : 0.0f; }
 
 	/** Returns CameraBoom subobject **/
 	FORCEINLINE class USpringArmComponent* GetCameraBoom() const { return CameraBoom; }

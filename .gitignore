@@ -27,10 +27,16 @@ Build/Windows/*
 Thumbs.db
 Desktop.ini
 
-# Release artifacts (uploaded via GitHub Releases)
+# Release artifacts (uploaded via GitHub Releases by default)
 *.zip
 *.7z
+!release-assets/
+!release-assets/.gitkeep
+!release-assets/ThreeDensity-Win64.zip
 
 # Installer build scratch
 Installer/*.b64
 .vercel
+
+# Local junk
+bash.exe.stackdump

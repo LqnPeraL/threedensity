@@ -1,0 +1,92 @@
+name: Release on commit
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build launcher
+        shell: pwsh
+        run: ./scripts/build-installer.ps1
+
+      - name: Resolve game zip
+        id: zip
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $out = Join-Path $env:GITHUB_WORKSPACE "ThreeDensity-Win64.zip"
+          $local = Join-Path $env:GITHUB_WORKSPACE "release-assets/ThreeDensity-Win64.zip"
+          if (Test-Path $local) {
+            Copy-Item $local $out -Force
+            Write-Host "Using committed release-assets zip"
+            "found=true" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+
+          try {
+            $prev = gh api "repos/$env:GITHUB_REPOSITORY/releases/latest" | ConvertFrom-Json
+            $asset = @($prev.assets) | Where-Object { $_.name -eq "ThreeDensity-Win64.zip" } | Select-Object -First 1
+            if ($asset -and $prev.tag_name) {
+              gh release download "$($prev.tag_name)" -p "ThreeDensity-Win64.zip" -R $env:GITHUB_REPOSITORY -D $env:GITHUB_WORKSPACE
+              if (Test-Path $out) {
+                Write-Host "Reusing zip from previous release $($prev.tag_name)"
+                "found=true" >> $env:GITHUB_OUTPUT
+                exit 0
+              }
+            }
+          } catch {
+            Write-Host "No previous fork zip yet: $_"
+          }
+
+          $upstream = "https://github.com/HyperlinksSpace/threedensity/releases/latest/download/ThreeDensity-Win64.zip"
+          Write-Host "Downloading bootstrap zip from upstream"
+          Invoke-WebRequest -Uri $upstream -OutFile $out -UseBasicParsing
+          if (Test-Path $out) {
+            "found=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "found=false" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Make tag and notes
+        id: meta
+        shell: pwsh
+        run: |
+          $sha = $env:GITHUB_SHA.Substring(0, 7)
+          $tag = "dev-$sha"
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "title=Test build $tag" >> $env:GITHUB_OUTPUT
+          @"
+          Auto-release for commit ``$env:GITHUB_SHA``
+
+          - Site: https://lqnpereal.github.io/threedensity/
+          - Download **ThreeDensitySetup.exe** from this release to install/update and play.
+          - To ship your cooked game for a commit, add ``release-assets/ThreeDensity-Win64.zip`` before pushing (see ``scripts/package-win64.ps1``).
+          "@ | Set-Content -Encoding utf8 release-notes.md
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ steps.meta.outputs.tag }}"
+          $title = "${{ steps.meta.outputs.title }}"
+          $args = @("release", "create", $tag, "Installer/ThreeDensitySetup.exe", "--title", $title, "--notes-file", "release-notes.md", "--latest")
+          if ((Test-Path "ThreeDensity-Win64.zip") -and ("${{ steps.zip.outputs.found }}" -eq "true")) {
+            $args = @("release", "create", $tag, "Installer/ThreeDensitySetup.exe", "ThreeDensity-Win64.zip", "--title", $title, "--notes-file", "release-notes.md", "--latest")
+          }
+          gh release delete $tag -y 2>$null
+          & gh @args

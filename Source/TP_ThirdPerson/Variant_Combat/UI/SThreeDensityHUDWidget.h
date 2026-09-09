@@ -25,6 +25,7 @@ private:
 	TSharedRef<SWidget> BuildPauseMenu();
 	TSharedRef<SWidget> BuildControlsPanel();
 	TSharedRef<SWidget> BuildSettingsPanel();
+	TSharedRef<SWidget> BuildHealthBar();
 
 	FReply OnResume();
 	FReply OnQuit();
@@ -42,9 +43,11 @@ private:
 	EVisibility GetPauseVisibility() const;
 	EVisibility GetTipVisibility() const;
 	EVisibility GetHintVisibility() const;
+	EVisibility GetHealthBarVisibility() const;
 	EVisibility GetControlsVisibility() const;
 	EVisibility GetSettingsVisibility() const;
 	FText GetTipText() const;
+	FText GetHealthLabel() const;
 	FText GetHardwareText() const;
 	FText GetBenchmarkText() const;
 	FText GetPresetLabel() const;
@@ -52,6 +55,7 @@ private:
 	FText GetVSyncLabel() const;
 	FText GetFpsLabel() const;
 	FText GetResolutionLabel() const;
+	TOptional<float> GetHealthPercent() const;
 
 	FSlateColor NavColor(int32 Tab) const;
 	FSlateColor PresetColor(int32 PresetIndex) const;

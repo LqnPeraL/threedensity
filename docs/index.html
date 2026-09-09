@@ -14,15 +14,15 @@
   <meta property="og:title" content="Three Density">
   <meta property="og:description" content="Third-person melee combat in a lava-cut arena. Combos, charged strikes, and AI that presses back.">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://threedensity.hyperlinks.space/">
-  <meta property="og:image" content="https://threedensity.hyperlinks.space/media/og-lockup.jpg">
+  <meta property="og:url" content="https://lqnpereal.github.io/threedensity/">
+  <meta property="og:image" content="https://lqnpereal.github.io/threedensity/media/og-lockup.jpg">
   <meta property="og:image:alt" content="Three Density">
   <meta property="og:image:width" content="1280">
   <meta property="og:image:height" content="640">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Three Density">
   <meta name="twitter:description" content="Third-person melee combat in a lava-cut arena.">
-  <meta name="twitter:image" content="https://threedensity.hyperlinks.space/media/og-lockup.jpg">
+  <meta name="twitter:image" content="https://lqnpereal.github.io/threedensity/media/og-lockup.jpg">
   <meta name="twitter:image:alt" content="Three Density">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -563,7 +563,7 @@
       <p class="lede">Third-person melee combat in a lava-cut arena. Combos, charged strikes, and AI that presses back.</p>
       <div class="cta-row">
         <div class="cta-fit">
-          <a id="download-btn" class="cta" href="https://github.com/HyperlinksSpace/threedensity/releases/latest/download/ThreeDensitySetup.exe" aria-label="Download launcher">
+          <a id="download-btn" class="cta" href="https://github.com/LqnPeraL/threedensity/releases/latest/download/ThreeDensitySetup.exe" aria-label="Download launcher">
             <span class="cta-face">
               <span class="cta-icon" aria-hidden="true">
                 <img src="media/cta-download-icon.png?v=9" width="112" height="112" alt="">
@@ -574,7 +574,7 @@
             </span>
           </a>
         </div>
-        <p class="cta-note">Updates on every launch · <a href="https://github.com/HyperlinksSpace/threedensity/releases/latest/download/ThreeDensity-Win64.zip">portable ZIP</a></p>
+        <p class="cta-note">Updates on every launch · <a href="https://github.com/LqnPeraL/threedensity/releases/latest/download/ThreeDensity-Win64.zip">portable ZIP</a></p>
       </div>
       <p id="release-meta" class="cta-release">Latest release loading…</p>
     </div>
@@ -632,10 +632,10 @@
   </section>
 
   <footer class="footer">
-    <a href="https://www.hyperlinks.space/">https://www.hyperlinks.space/</a>
+    <a href="https://lqnpereal.github.io/threedensity/">https://lqnpereal.github.io/threedensity/</a>
     <div>
-      <a href="https://github.com/HyperlinksSpace/threedensity">Source</a>
-      <a href="https://github.com/HyperlinksSpace/threedensity/releases">Releases</a>
+      <a href="https://github.com/LqnPeraL/threedensity">Source</a>
+      <a href="https://github.com/LqnPeraL/threedensity/releases">Releases</a>
     </div>
   </footer>
 
@@ -704,11 +704,15 @@
         if (copyEl) ro.observe(copyEl);
       }
 
-      fetch('https://api.github.com/repos/HyperlinksSpace/threedensity/releases/latest')
+      fetch('https://api.github.com/repos/LqnPeraL/threedensity/releases/latest')
         .then(function (r) { return r.json(); })
         .then(function (data) {
           const setup = data.assets && data.assets.find(function (a) { return a.name === 'ThreeDensitySetup.exe'; });
           if (setup) document.getElementById('download-btn').href = setup.browser_download_url;
+
+          const zipLink = document.querySelector('.cta-note a');
+          const zip = data.assets && data.assets.find(function (a) { return a.name === 'ThreeDensity-Win64.zip'; });
+          if (zipLink && zip) zipLink.href = zip.browser_download_url;
 
           const meta = document.getElementById('release-meta');
           if (!meta || !data.tag_name) return;
