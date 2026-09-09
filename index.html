@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Three Density</title>
+  <meta name="description" content="Three Density — third-person combat. Download the launcher and play.">
+  <link rel="icon" href="media/favicon.ico?v=6" sizes="any">
+  <link rel="icon" type="image/png" href="media/favicon-32.png?v=6" sizes="32x32">
+  <link rel="icon" type="image/png" href="media/favicon-48.png?v=6" sizes="48x48">
+  <link rel="icon" type="image/png" href="media/icon-192.png?v=6" sizes="192x192">
+  <link rel="apple-touch-icon" href="media/apple-touch-icon.png?v=6" sizes="256x256">
+  <link rel="manifest" href="site.webmanifest">
+  <meta property="og:title" content="Three Density">
+  <meta property="og:description" content="Third-person melee combat in a lava-cut arena. Combos, charged strikes, and AI that presses back.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://LqnPeraL.github.io/threedensity/">
+  <meta property="og:image" content="https://LqnPeraL.github.io/threedensity/media/og-lockup.jpg">
+  <meta property="og:image:alt" content="Three Density">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Three Density">
+  <meta name="twitter:description" content="Third-person melee combat in a lava-cut arena.">
+  <meta name="twitter:image" content="https://LqnPeraL.github.io/threedensity/media/og-lockup.jpg">
+  <meta name="twitter:image:alt" content="Three Density">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --void: #070708;
+      --ink: #f4f1ec;
+      --muted: #9a958c;
+      --steel: #d8d2c8;
+      --ember: #ff7a2f;
+      --ember-deep: #c44a12;
+      --line: rgba(255, 255, 255, 0.08);
+      --glow: rgba(255, 122, 47, 0.35);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: "Sora", sans-serif;
+      background: var(--void);
+      color: var(--ink);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+    a { color: inherit; }
+
+    /* —— Hero —— */
+    .hero {
+      position: relative;
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: grid;
+      align-items: end;
+      isolation: isolate;
+      overflow: hidden;
+    }
+    .hero-media {
+      position: absolute;
+      inset: 0;
+      z-index: -3;
+      background: #0a0a0b;
+    }
+    .hero-media img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0;
+      transform: scale(1.04);
+      transition: opacity 1.35s ease;
+      will-change: opacity, transform;
+      pointer-events: none;
+    }
+    .hero-media img.is-active {
+      opacity: 1;
+      transform: scale(1.1);
+      transition:
+        opacity 1.35s ease,
+        transform 7.5s cubic-bezier(.15,.6,.25,1);
+    }
+    .hero-veil {
+      position: absolute;
+      inset: 0;
+      z-index: -2;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 80% 55% at 70% 40%, transparent 0%, rgba(7,7,8,.25) 55%, rgba(7,7,8,.72) 100%),
+        linear-gradient(90deg, rgba(7,7,8,.78) 0%, rgba(7,7,8,.28) 42%, rgba(7,7,8,.18) 100%),
+        linear-gradient(0deg, rgba(7,7,8,.92) 0%, rgba(7,7,8,.35) 38%, transparent 68%);
+    }
+    .hero-grain {
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      opacity: .07;
+      mix-blend-mode: overlay;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    .hero-copy {
+      position: relative;
+      width: min(640px, 100%);
+      max-width: 100%;
+      min-width: 0;
+      padding: 0 clamp(1.25rem, 4vw, 3rem) clamp(3.5rem, 8vh, 5.5rem);
+      animation: rise 1s cubic-bezier(.16,1,.3,1) both;
+    }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(28px); }
+      to { opacity: 1; transform: none; }
+    }
+    .brand-logo {
+      display: block;
+      width: min(520px, 88vw);
+      height: auto;
+      filter: drop-shadow(0 18px 48px rgba(0,0,0,.55)) drop-shadow(0 0 28px rgba(255,122,47,.18));
+    }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      border: 0;
+    }
+    .lede {
+      margin-top: 1.15rem;
+      max-width: 32rem;
+      color: var(--steel);
+      font-size: clamp(1rem, 1.5vw, 1.12rem);
+      font-weight: 400;
+    }
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 1rem 1.5rem;
+      margin-top: 1.85rem;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+    }
+    .cta-fit {
+      display: block;
+      width: fit-content;
+      max-width: 100%;
+      min-width: 0;
+      line-height: 0;
+    }
+    .cta {
+      --cta-cut: 16px;
+      --cta-pad-y: .55rem;
+      --cta-pad-x: .75rem;
+      --cta-pad-l: .5rem;
+      --cta-gap: .5rem;
+      --cta-icon: 2.15rem;
+      --cta-label-h: 1.85rem;
+      position: relative;
+      isolation: isolate;
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: var(--cta-gap);
+      box-sizing: border-box;
+      width: max-content;
+      min-height: calc(var(--cta-label-h) + (var(--cta-pad-y) * 2));
+      padding: var(--cta-pad-y) var(--cta-pad-x) var(--cta-pad-y) var(--cta-pad-l);
+      color: #f4f1ec;
+      text-decoration: none;
+      line-height: 1;
+      transform-origin: left center;
+      clip-path: polygon(0 0, calc(100% - var(--cta-cut)) 0, 100% var(--cta-cut), 100% 100%, 0 100%);
+      background-color: #4e4b47;
+      background-image:
+        linear-gradient(180deg, rgba(255,255,255,.18) 0%, rgba(255,255,255,.04) 16%, transparent 40%, transparent 62%, rgba(0,0,0,.55) 100%),
+        linear-gradient(90deg, rgba(0,0,0,.38) 0%, transparent 12%, transparent 88%, rgba(0,0,0,.3) 100%),
+        url("media/cta-metal.png?v=3");
+      background-size: auto, auto, cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      box-shadow:
+        0 18px 40px rgba(0,0,0,.62),
+        0 0 0 1px rgba(200,196,188,.22),
+        0 0 16px rgba(255,122,47,.12),
+        inset 0 2px 0 rgba(255,255,255,.42),
+        inset 0 -3px 0 rgba(0,0,0,.62),
+        inset 3px 0 0 rgba(255,255,255,.12),
+        inset -3px 0 0 rgba(0,0,0,.4),
+        inset 0 -6px 12px rgba(255,100,30,.08);
+      overflow: hidden;
+      transition: filter .2s ease, box-shadow .2s ease;
+    }
+    .cta::before,
+    .cta::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    .cta::before {
+      z-index: -1;
+      background:
+        linear-gradient(180deg, transparent 68%, rgba(255,100,30,.08) 100%),
+        url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      opacity: .4;
+      mix-blend-mode: soft-light;
+    }
+    .cta::after {
+      z-index: 3;
+      background: linear-gradient(105deg, transparent 18%, rgba(255,255,255,0) 38%, rgba(255,252,245,.42) 48%, rgba(220,210,195,.12) 54%, transparent 66%);
+      transform: translateX(-130%);
+      animation: cta-sheen 5.2s cubic-bezier(.4,0,.2,1) infinite;
+    }
+    .cta-face {
+      position: relative;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--cta-gap);
+      transform: none;
+    }
+    .cta-icon {
+      width: var(--cta-icon);
+      height: var(--cta-icon);
+      flex: 0 0 var(--cta-icon);
+      display: grid;
+      place-items: center;
+    }
+    .cta-icon img,
+    .cta-label img {
+      display: block;
+      transform: none;
+      animation: none;
+    }
+    .cta-icon img {
+      width: var(--cta-icon);
+      height: var(--cta-icon);
+      object-fit: contain;
+      transform: translateY(-1px);
+      filter:
+        contrast(1.08) brightness(1.02) saturate(.78)
+        drop-shadow(1px 0 0 rgba(0,0,0,.95))
+        drop-shadow(-1px 0 0 rgba(0,0,0,.95))
+        drop-shadow(0 1px 0 rgba(0,0,0,.95))
+        drop-shadow(0 -1px 0 rgba(0,0,0,.95))
+        drop-shadow(0 1px 0 rgba(255,255,255,.45))
+        drop-shadow(0 2px 2px rgba(0,0,0,.6));
+    }
+    .cta-label {
+      display: inline-flex;
+      align-items: center;
+      height: var(--cta-label-h);
+      line-height: 0;
+    }
+    .cta-label img {
+      height: var(--cta-label-h);
+      width: auto;
+      max-width: none;
+      object-fit: contain;
+      object-position: left center;
+      filter:
+        contrast(1.1) brightness(1.03) saturate(.75)
+        drop-shadow(1px 0 0 rgba(0,0,0,.95))
+        drop-shadow(-1px 0 0 rgba(0,0,0,.95))
+        drop-shadow(0 1px 0 rgba(0,0,0,.95))
+        drop-shadow(0 -1px 0 rgba(0,0,0,.95))
+        drop-shadow(0 1px 0 rgba(255,255,255,.42))
+        drop-shadow(0 2px 2px rgba(0,0,0,.6));
+    }
+    .cta:hover {
+      filter: brightness(1.05);
+      box-shadow:
+        0 18px 40px rgba(0,0,0,.62),
+        0 0 0 1px rgba(220,214,200,.35),
+        0 0 22px rgba(255,122,47,.18),
+        inset 0 2px 0 rgba(255,255,255,.48),
+        inset 0 -3px 0 rgba(0,0,0,.6),
+        inset 3px 0 0 rgba(255,255,255,.14),
+        inset -3px 0 0 rgba(0,0,0,.38),
+        inset 0 -6px 12px rgba(255,100,30,.1);
+    }
+    .cta:hover::after { animation-duration: 2.8s; }
+    .cta:active {
+      filter: brightness(.96);
+      box-shadow:
+        0 10px 24px rgba(0,0,0,.55),
+        0 0 0 1px rgba(255,180,120,.28),
+        inset 0 3px 8px rgba(0,0,0,.5);
+    }
+    @keyframes cta-sheen {
+      0%, 58% { transform: translateX(-130%); opacity: 0; }
+      62% { opacity: 1; }
+      80% { transform: translateX(130%); opacity: .85; }
+      100% { transform: translateX(130%); opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .cta::after { animation: none; }
+    }
+    .cta-note {
+      color: var(--muted);
+      font-size: .86rem;
+    }
+    .cta-release {
+      margin-top: 1rem;
+      color: var(--steel);
+      font-size: .92rem;
+      letter-spacing: .01em;
+    }
+    .cta-release strong {
+      color: var(--ink);
+      font-weight: 600;
+    }
+    .cta-release time {
+      display: block;
+      margin-top: .2rem;
+      color: var(--muted);
+      font-size: .84rem;
+    }
+    .cta-note a {
+      color: var(--ember);
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+      transition: border-color .2s;
+    }
+    .cta-note a:hover { border-bottom-color: var(--ember); }
+    .hero-scroll {
+      position: absolute;
+      right: clamp(1.25rem, 4vw, 3rem);
+      bottom: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .5rem;
+      color: var(--muted);
+      font-size: .65rem;
+      letter-spacing: .28em;
+      text-transform: uppercase;
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+    .hero-scroll i {
+      width: 1px;
+      height: 42px;
+      background: linear-gradient(var(--ember), transparent);
+      display: block;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: .45; transform: translateY(0); }
+      50% { opacity: 1; transform: translateY(6px); }
+    }
+
+    /* —— Sections —— */
+    .band {
+      position: relative;
+      padding: clamp(4rem, 9vw, 7rem) clamp(1.25rem, 4vw, 3rem);
+    }
+    .band-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+    .band-kicker {
+      font-family: "Orbitron", sans-serif;
+      font-size: .68rem;
+      letter-spacing: .28em;
+      text-transform: uppercase;
+      color: var(--ember);
+      margin-bottom: .85rem;
+    }
+    h2 {
+      font-family: "Orbitron", sans-serif;
+      font-size: clamp(1.55rem, 3.2vw, 2.35rem);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      font-weight: 700;
+      line-height: 1.15;
+      margin-bottom: .85rem;
+    }
+    .section-lede {
+      color: var(--muted);
+      max-width: 36rem;
+      margin-bottom: 2.25rem;
+      font-size: 1.02rem;
+    }
+
+    .gallery {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr 1fr;
+      grid-template-rows: minmax(200px, 26vh) minmax(200px, 26vh);
+      gap: .65rem;
+    }
+    .gallery a {
+      position: relative;
+      overflow: hidden;
+      display: block;
+      background: #121214;
+    }
+    .gallery a:first-child {
+      grid-row: 1 / -1;
+    }
+    .gallery a:last-child {
+      grid-column: 2 / -1;
+    }
+    .gallery img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform .7s cubic-bezier(.16,1,.3,1), filter .4s ease;
+      filter: saturate(1.08) contrast(1.04);
+    }
+    .gallery a:hover img {
+      transform: scale(1.05);
+      filter: saturate(1.15) contrast(1.08);
+    }
+    .gallery a::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border: 1px solid transparent;
+      transition: border-color .3s ease, box-shadow .3s ease;
+      pointer-events: none;
+    }
+    .gallery a:hover::after {
+      border-color: rgba(255,122,47,.35);
+      box-shadow: inset 0 0 40px rgba(255,122,47,.08);
+    }
+
+    .install-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      counter-reset: step;
+    }
+    .install-grid article {
+      position: relative;
+      padding: 1.5rem 0 0;
+      border-top: 1px solid var(--line);
+      counter-increment: step;
+    }
+    .install-grid article::before {
+      content: counter(step, decimal-leading-zero);
+      font-family: "Orbitron", sans-serif;
+      font-size: .75rem;
+      letter-spacing: .16em;
+      color: var(--ember);
+      display: block;
+      margin-bottom: .85rem;
+    }
+    .install-grid h3 {
+      font-family: "Orbitron", sans-serif;
+      font-size: .95rem;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      margin-bottom: .55rem;
+      font-weight: 600;
+    }
+    .install-grid p {
+      color: var(--muted);
+      font-size: .95rem;
+    }
+
+    .specs {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .specs th, .specs td {
+      text-align: left;
+      padding: 1rem 0;
+      border-bottom: 1px solid var(--line);
+      font-size: .95rem;
+    }
+    .specs th {
+      width: 28%;
+      color: var(--muted);
+      font-weight: 500;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      font-size: .78rem;
+    }
+
+    .footer {
+      border-top: 1px solid var(--line);
+      padding: 2.25rem clamp(1.25rem, 4vw, 3rem) 3rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--muted);
+      font-size: .86rem;
+    }
+    .footer a {
+      color: var(--steel);
+      text-decoration: none;
+      margin-left: 1.1rem;
+      transition: color .2s;
+    }
+    .footer a:hover { color: var(--ember); }
+    @media (max-width: 900px) {
+      .gallery {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: minmax(220px, 32vh) minmax(160px, 22vh) minmax(160px, 22vh);
+      }
+      .gallery a:first-child {
+        grid-column: 1 / -1;
+        grid-row: auto;
+      }
+      .gallery a:last-child {
+        grid-column: auto;
+      }
+      .install-grid { grid-template-columns: 1fr; gap: 1.1rem; }
+      .hero-scroll { display: none; }
+      .hero-copy { width: min(100%, 640px); }
+      .cta-fit { max-width: 100%; }
+    }
+    @media (max-width: 560px) {
+      .gallery {
+        grid-template-columns: 1fr;
+        grid-template-rows: none;
+      }
+      .gallery a { min-height: 200px; }
+      .cta-row {
+        flex-direction: column;
+        align-items: flex-start;
+        width: 100%;
+        gap: .85rem;
+      }
+      .cta-fit { max-width: 100%; }
+      .cta-note { font-size: .8rem; line-height: 1.45; }
+      .brand-logo { width: min(100%, 92vw); }
+      .lede { font-size: .98rem; }
+      .footer {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: .85rem;
+      }
+      .footer a { margin-left: 0; margin-right: 1rem; }
+      .specs th { width: 36%; font-size: .72rem; }
+      .specs th, .specs td { padding: .85rem 0; font-size: .9rem; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-media" aria-hidden="true">
+      <img src="media/shot-combat.jpg" alt="" decoding="async">
+      <img src="media/shot-arena.jpg" alt="" decoding="async">
+      <img src="media/shot-heavy.jpg" alt="" decoding="async">
+      <img src="media/shot-checkpoint.jpg" alt="" decoding="async">
+    </div>
+    <div class="hero-veil"></div>
+    <div class="hero-grain" aria-hidden="true"></div>
+    <div class="hero-copy">
+      <h1 class="sr-only">Three Density</h1>
+      <img class="brand-logo" src="media/logo-lockup.png?v=6" width="520" height="200" alt="Three Density">
+      <p class="lede">Third-person melee combat in a lava-cut arena. Combos, charged strikes, and AI that presses back.</p>
+      <div class="cta-row">
+        <div class="cta-fit">
+          <a id="download-btn" class="cta" href="https://github.com/LqnPeraL/threedensity/releases/latest/download/ThreeDensitySetup.exe" aria-label="Download launcher">
+            <span class="cta-face">
+              <span class="cta-icon" aria-hidden="true">
+                <img src="media/cta-download-icon.png?v=9" width="112" height="112" alt="">
+              </span>
+              <span class="cta-label">
+                <img src="media/cta-label-metal.png?v=9" width="575" height="60" alt="Download launcher">
+              </span>
+            </span>
+          </a>
+        </div>
+        <p class="cta-note">Updates on every launch · <a href="https://github.com/LqnPeraL/threedensity/releases/latest/download/ThreeDensity-Win64.zip">portable ZIP</a></p>
+      </div>
+      <p id="release-meta" class="cta-release">Latest release loading…</p>
+    </div>
+    <div class="hero-scroll" aria-hidden="true">Scroll<i></i></div>
+  </header>
+
+  <section class="band" id="arena">
+    <div class="band-inner">
+      <p class="band-kicker">World</p>
+      <h2>In the arena</h2>
+      <p class="section-lede">Industrial platforms, lava hazards, and close-range fights from the combat variant.</p>
+      <div class="gallery">
+        <a href="media/shot-combat.jpg"><img src="media/shot-combat.jpg" alt="Combo fight over the lava arena" loading="lazy"></a>
+        <a href="media/shot-heavy.jpg"><img src="media/shot-heavy.jpg" alt="Charged strike impact" loading="lazy"></a>
+        <a href="media/shot-checkpoint.jpg"><img src="media/shot-checkpoint.jpg" alt="Checkpoint overlook" loading="lazy"></a>
+        <a href="media/shot-arena.jpg"><img src="media/shot-arena.jpg" alt="Lava arena overlook" loading="lazy"></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="install">
+    <div class="band-inner">
+      <p class="band-kicker">Play</p>
+      <h2>Install once. Launch forever.</h2>
+      <p class="section-lede">The launcher keeps the build current against GitHub Releases — no manual re-download when patches drop.</p>
+      <div class="install-grid">
+        <article>
+          <h3>Get the launcher</h3>
+          <p>Download <strong>ThreeDensitySetup.exe</strong> — a small updater, not the full game archive.</p>
+        </article>
+        <article>
+          <h3>Run it once</h3>
+          <p>It installs under your user folder and creates a <strong>Three Density</strong> desktop shortcut to the launcher.</p>
+        </article>
+        <article>
+          <h3>Always use the shortcut</h3>
+          <p>Every start checks for a newer release, updates if needed, then opens the game.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="system">
+    <div class="band-inner">
+      <p class="band-kicker">Hardware</p>
+      <h2>System</h2>
+      <table class="specs">
+        <tr><th>OS</th><td>Windows 10 / 11 64-bit</td></tr>
+        <tr><th>CPU</th><td>Quad-core 2.5 GHz+</td></tr>
+        <tr><th>RAM</th><td>8 GB (16 GB recommended)</td></tr>
+        <tr><th>GPU</th><td>DirectX 12 · 4 GB VRAM+</td></tr>
+        <tr><th>Storage</th><td>~1 GB after install</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <a href="https://LqnPeraL.github.io/threedensity/">https://LqnPeraL.github.io/threedensity/</a>
+    <div>
+      <a href="https://github.com/LqnPeraL/threedensity">Source</a>
+      <a href="https://github.com/LqnPeraL/threedensity/releases">Releases</a>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      const slides = Array.from(document.querySelectorAll('.hero-media img'));
+      if (!slides.length) return;
+      let index = 0;
+      let z = 1;
+      slides[0].classList.add('is-active');
+      slides[0].style.zIndex = String(z);
+
+      const HOLD_MS = 5200;
+      const FADE_MS = 1350;
+
+      function nextSlide() {
+        const prev = slides[index];
+        index = (index + 1) % slides.length;
+        const next = slides[index];
+        next.style.zIndex = String(++z);
+        next.classList.add('is-active');
+        window.setTimeout(function () {
+          if (prev !== next) prev.classList.remove('is-active');
+        }, FADE_MS);
+      }
+
+      window.setInterval(nextSlide, HOLD_MS);
+
+      function fitCta() {
+        var fit = document.querySelector('.cta-fit');
+        var cta = document.getElementById('download-btn');
+        var row = document.querySelector('.cta-row');
+        var copy = document.querySelector('.hero-copy');
+        if (!fit || !cta || !row) return;
+        cta.style.transform = 'none';
+        fit.style.width = '';
+        fit.style.height = '';
+        var natural = cta.offsetWidth;
+        var avail = row.clientWidth;
+        if (copy) {
+          var cs = window.getComputedStyle(copy);
+          var pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+          var content = copy.clientWidth - pad;
+          var viewportCap = window.innerWidth - pad;
+          if (content > 0) avail = Math.min(avail, content);
+          if (viewportCap > 0) avail = Math.min(avail, viewportCap);
+        }
+        if (!avail || !natural) return;
+        var scale = Math.min(1, avail / natural);
+        cta.style.transform = 'scale(' + scale + ')';
+        fit.style.width = (natural * scale) + 'px';
+        fit.style.height = (cta.offsetHeight * scale) + 'px';
+      }
+      fitCta();
+      window.addEventListener('resize', fitCta);
+      window.addEventListener('load', fitCta);
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitCta).catch(function () {});
+      Array.prototype.forEach.call(document.querySelectorAll('#download-btn img'), function (img) {
+        if (!img.complete) img.addEventListener('load', fitCta);
+      });
+      if (window.ResizeObserver) {
+        var ro = new ResizeObserver(fitCta);
+        var rowEl = document.querySelector('.cta-row');
+        var copyEl = document.querySelector('.hero-copy');
+        if (rowEl) ro.observe(rowEl);
+        if (copyEl) ro.observe(copyEl);
+      }
+
+      fetch('https://api.github.com/repos/LqnPeraL/threedensity/releases/latest')
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          const setup = data.assets && data.assets.find(function (a) { return a.name === 'ThreeDensitySetup.exe'; });
+          if (setup) document.getElementById('download-btn').href = setup.browser_download_url;
+
+          const zipLink = document.querySelector('.cta-note a');
+          const zip = data.assets && data.assets.find(function (a) { return a.name === 'ThreeDensity-Win64.zip'; });
+          if (zipLink && zip) zipLink.href = zip.browser_download_url;
+
+          const meta = document.getElementById('release-meta');
+          if (!meta || !data.tag_name) return;
+
+          const tag = String(data.tag_name);
+          const published = data.published_at || data.created_at;
+          const when = published
+            ? new Date(published).toLocaleString(undefined, {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+              })
+            : '';
+
+          meta.innerHTML = '';
+          const line = document.createElement('span');
+          line.innerHTML = 'Latest release <strong></strong>';
+          line.querySelector('strong').textContent = tag;
+          meta.appendChild(line);
+          if (when) {
+            const time = document.createElement('time');
+            time.dateTime = published;
+            time.textContent = when;
+            meta.appendChild(time);
+          }
+        })
+        .catch(function () {
+          const meta = document.getElementById('release-meta');
+          if (meta) meta.textContent = 'Latest release unavailable';
+        });
+    })();
+  </script>
+</body>
+</html>

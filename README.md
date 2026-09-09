@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/media/logo-lockup.png" alt="Three Density" width="520">
+  <img src="media/logo-lockup.png" alt="Three Density" width="520">
 </p>
 
 Third-person combat action. Fight through enemy pressure, master combos and charged strikes, and survive lava arenas.
@@ -10,13 +10,11 @@ Third-person combat action. Fight through enemy pressure, master combos and char
 
 The launcher installs the game, creates a desktop shortcut, and **checks GitHub for updates on every launch** before starting.
 
-Game page: **[Open site](https://cdn.jsdelivr.net/gh/LqnPeraL/threedensity@main/docs/)** · GitHub Pages: [LqnPeraL.github.io/threedensity](https://LqnPeraL.github.io/threedensity/)
-
-> Note: all-lowercase `lqnpereal.github.io` currently 404s (GitHub Host routing). Use the CDN link above, or the mixed-case Pages URL. Renaming the GitHub user to all-lowercase fixes Pages in normal browsers.
+Game page: **[LqnPeraL.github.io/threedensity](https://LqnPeraL.github.io/threedensity/)**
 
 Portable ZIP (optional): [ThreeDensity-Win64.zip](https://github.com/LqnPeraL/threedensity/releases/latest/download/ThreeDensity-Win64.zip)
 
-Every push to `main` deploys the site (GitHub Pages) and publishes a release you can download to test that commit.
+Every push to `main` publishes a release you can download to test that commit. The game website is served by **GitHub Pages from the repository root** (`index.html` + `media/`).
 
 ## In-game
 
