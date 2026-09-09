@@ -28,6 +28,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          $ErrorActionPreference = "Continue"
           $out = Join-Path $env:GITHUB_WORKSPACE "ThreeDensity-Win64.zip"
           $local = Join-Path $env:GITHUB_WORKSPACE "release-assets/ThreeDensity-Win64.zip"
           if (Test-Path $local) {
@@ -37,8 +38,9 @@ jobs:
             exit 0
           }
 
-          try {
-            $prev = gh api "repos/$env:GITHUB_REPOSITORY/releases/latest" | ConvertFrom-Json
+          $prevJson = gh api "repos/$env:GITHUB_REPOSITORY/releases/latest" 2>$null
+          if ($LASTEXITCODE -eq 0 -and $prevJson) {
+            $prev = $prevJson | ConvertFrom-Json
             $asset = @($prev.assets) | Where-Object { $_.name -eq "ThreeDensity-Win64.zip" } | Select-Object -First 1
             if ($asset -and $prev.tag_name) {
               gh release download "$($prev.tag_name)" -p "ThreeDensity-Win64.zip" -R $env:GITHUB_REPOSITORY -D $env:GITHUB_WORKSPACE
@@ -48,16 +50,19 @@ jobs:
                 exit 0
               }
             }
-          } catch {
-            Write-Host "No previous fork zip yet: $_"
+          } else {
+            Write-Host "No previous fork release yet"
           }
 
-          $upstream = "https://github.com/HyperlinksSpace/threedensity/releases/latest/download/ThreeDensity-Win64.zip"
           Write-Host "Downloading bootstrap zip from upstream"
-          Invoke-WebRequest -Uri $upstream -OutFile $out -UseBasicParsing
+          gh release download -R HyperlinksSpace/threedensity -p "ThreeDensity-Win64.zip" -D $env:GITHUB_WORKSPACE
+          if (-not (Test-Path $out)) {
+            curl.exe -L --retry 3 --retry-all-errors -o $out "https://github.com/HyperlinksSpace/threedensity/releases/latest/download/ThreeDensity-Win64.zip"
+          }
           if (Test-Path $out) {
             "found=true" >> $env:GITHUB_OUTPUT
           } else {
+            Write-Host "WARNING: could not fetch Win64 zip; publishing launcher only"
             "found=false" >> $env:GITHUB_OUTPUT
           }
 
