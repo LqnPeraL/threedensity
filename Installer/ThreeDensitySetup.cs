@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -6,6 +7,7 @@ using System.Drawing.Text;
 using System.IO;
 using System.IO.Compression;
 using System.Net;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
@@ -603,25 +605,42 @@ public sealed class LauncherForm : Form
 
     void RunInstall(ReleaseInfo release, bool firstInstall)
     {
-        if (firstInstall)
-            SetStatus("Downloading Three Density " + release.Tag + "…", 15);
-        else
-            SetStatus("Downloading update " + release.Tag + "…", 15);
-
         string zipUrl = string.IsNullOrEmpty(release.ZipUrl) ? FallbackZip : release.ZipUrl;
         string zipPath = Path.Combine(installRoot, "ThreeDensity-Win64.zip");
-        Download(zipUrl, zipPath);
+        string zipCacheTag = Path.Combine(installRoot, "zip-cache.tag");
+        string tag = release.Tag ?? "";
 
-        SetStatus("Installing " + release.Tag + "…", 82);
+        bool reuseZip = File.Exists(zipPath)
+            && File.Exists(zipCacheTag)
+            && string.Equals(File.ReadAllText(zipCacheTag).Trim(), tag, StringComparison.OrdinalIgnoreCase)
+            && new FileInfo(zipPath).Length > 1024 * 1024;
+
+        if (reuseZip)
+        {
+            SetStatus("Using cached package " + tag + "…", 80);
+        }
+        else
+        {
+            if (firstInstall)
+                SetStatus("Downloading Three Density " + tag + "…", 15);
+            else
+                SetStatus("Downloading update " + tag + "…", 15);
+
+            Download(zipUrl, zipPath);
+            try { File.WriteAllText(zipCacheTag, tag); } catch { }
+        }
+
+        SetStatus(firstInstall ? "Installing " + tag + "…" : "Updating changed files…", 82);
         InstallGameFromZip(zipPath);
         try { File.Delete(zipPath); } catch { }
+        try { File.Delete(zipCacheTag); } catch { }
 
         launchPath = FindExe(gameDir);
         if (string.IsNullOrEmpty(launchPath) || !File.Exists(launchPath))
             throw new InvalidOperationException("Install finished but threedensity.exe was not found.");
 
-        File.WriteAllText(versionFile, release.Tag ?? "");
-        installedVersion = release.Tag ?? "";
+        File.WriteAllText(versionFile, tag);
+        installedVersion = tag;
         latestVersion = installedVersion;
         RefreshVersionLabel();
         TryRefreshLauncher(release.SetupUrl);
@@ -712,22 +731,155 @@ public sealed class LauncherForm : Form
 
     void InstallGameFromZip(string zipPath)
     {
-        string staging = Path.Combine(installRoot, "Game.staging");
-        if (Directory.Exists(staging)) Directory.Delete(staging, true);
-        Directory.CreateDirectory(staging);
-        ZipFile.ExtractToDirectory(zipPath, staging);
+        string manifestPath = Path.Combine(installRoot, "file-manifest.tsv");
+        Dictionary<string, long> previous = LoadFileManifest(manifestPath);
+        var package = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        int updated = 0;
+        int skipped = 0;
+        int total = 0;
 
-        if (Directory.Exists(gameDir))
+        Directory.CreateDirectory(gameDir);
+
+        using (ZipArchive archive = ZipFile.OpenRead(zipPath))
         {
-            try { Directory.Delete(gameDir, true); }
-            catch
+            foreach (ZipArchiveEntry entry in archive.Entries)
             {
-                string old = gameDir + ".old-" + DateTime.Now.Ticks;
-                Directory.Move(gameDir, old);
-                try { Directory.Delete(old, true); } catch { }
+                if (string.IsNullOrEmpty(entry.Name)) continue;
+                string rel = NormalizeZipRelativePath(entry.FullName);
+                if (string.IsNullOrEmpty(rel)) continue;
+
+                total++;
+                long len = entry.Length;
+                package[rel] = len;
+
+                string dest = Path.Combine(gameDir, rel);
+                if (FileMatchesStamp(dest, len, previous, rel))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                string parent = Path.GetDirectoryName(dest);
+                if (!string.IsNullOrEmpty(parent)) Directory.CreateDirectory(parent);
+
+                entry.ExtractToFile(dest, true);
+                updated++;
+
+                if ((updated + skipped) % 8 == 0 || updated == 1)
+                {
+                    int pct = 82 + Math.Min(15, (updated + skipped) * 15 / Math.Max(1, total));
+                    SetStatus(string.Format("Updating… {0} changed, {1} unchanged", updated, skipped), pct);
+                }
             }
         }
-        Directory.Move(staging, gameDir);
+
+        RemoveObsoleteGameFiles(package.Keys);
+        SaveFileManifest(manifestPath, package);
+
+        SetStatus(string.Format("Update complete — {0} file(s) replaced, {1} kept", updated, skipped), 97);
+
+        string leftoverStaging = Path.Combine(installRoot, "Game.staging");
+        if (Directory.Exists(leftoverStaging))
+        {
+            try { Directory.Delete(leftoverStaging, true); } catch { }
+        }
+    }
+
+    static Dictionary<string, long> LoadFileManifest(string path)
+    {
+        var map = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        if (!File.Exists(path)) return map;
+        try
+        {
+            foreach (string line in File.ReadAllLines(path))
+            {
+                if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#")) continue;
+                string[] parts = line.Split('\t');
+                if (parts.Length < 2) continue;
+                long size;
+                if (!long.TryParse(parts[1], out size)) continue;
+                string rel = NormalizeZipRelativePath(parts[0]);
+                if (string.IsNullOrEmpty(rel)) continue;
+                map[rel] = size;
+            }
+        }
+        catch { }
+        return map;
+    }
+
+    static void SaveFileManifest(string path, Dictionary<string, long> package)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("# rel\tsize");
+        foreach (KeyValuePair<string, long> kv in package)
+            sb.Append(kv.Key).Append('\t').Append(kv.Value).Append('\n');
+        File.WriteAllText(path, sb.ToString());
+    }
+
+    static bool FileMatchesStamp(string dest, long len, Dictionary<string, long> previous, string rel)
+    {
+        if (!File.Exists(dest)) return false;
+        FileInfo fi;
+        try { fi = new FileInfo(dest); }
+        catch { return false; }
+        if (fi.Length != len) return false;
+
+        long prev;
+        if (previous.TryGetValue(rel, out prev) && prev == len)
+            return true;
+
+        // First run under the incremental installer: trust same size.
+        if (previous.Count == 0)
+            return true;
+
+        return false;
+    }
+
+    void RemoveObsoleteGameFiles(IEnumerable<string> keepRelative)
+    {
+        if (!Directory.Exists(gameDir)) return;
+        var keep = new HashSet<string>(keepRelative, StringComparer.OrdinalIgnoreCase);
+        string[] files;
+        try { files = Directory.GetFiles(gameDir, "*", SearchOption.AllDirectories); }
+        catch { return; }
+
+        foreach (string file in files)
+        {
+            string rel;
+            try
+            {
+                rel = file.Substring(gameDir.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                rel = NormalizeZipRelativePath(rel);
+            }
+            catch { continue; }
+            if (string.IsNullOrEmpty(rel) || keep.Contains(rel)) continue;
+            try { File.Delete(file); } catch { }
+        }
+
+        try
+        {
+            string[] dirs = Directory.GetDirectories(gameDir, "*", SearchOption.AllDirectories);
+            Array.Sort(dirs, (a, b) => b.Length.CompareTo(a.Length));
+            foreach (string dir in dirs)
+            {
+                try
+                {
+                    if (Directory.Exists(dir) && Directory.GetFileSystemEntries(dir).Length == 0)
+                        Directory.Delete(dir, false);
+                }
+                catch { }
+            }
+        }
+        catch { }
+    }
+
+    static string NormalizeZipRelativePath(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return null;
+        path = path.Replace('/', '\\').Trim().TrimStart('\\');
+        if (path.Length == 0) return null;
+        if (path.IndexOf("..", StringComparison.Ordinal) >= 0) return null;
+        return path;
     }
 
     void LaunchGameAndExit()

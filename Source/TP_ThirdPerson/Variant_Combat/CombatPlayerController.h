@@ -98,4 +98,7 @@ protected:
 
 	void ApplyMenuInputMode();
 
+	void JumpPressed();
+	void JumpReleased();
+
 };

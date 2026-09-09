@@ -383,13 +383,13 @@ protected:
 	/** Maps Space / gamepad A onto JumpAction through Enhanced Input */
 	void EnsureJumpInputMapping();
 
+public:
+
 	/** Space / jump pressed */
 	void JumpPressed();
 
 	/** Space / jump released */
 	void JumpReleased();
-
-public:
 
 	/** Current / max HP for HUD */
 	float GetCurrentHP() const { return CurrentHP; }

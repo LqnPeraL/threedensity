@@ -559,11 +559,27 @@ void ACombatCharacter::BeginPlay()
 	ResetHP();
 
 	LastDamageWorldTime = GetWorld()->GetTimeSeconds();
+
+	// IMC_Combat has no Jump mapping — install Space / gamepad A as soon as we exist
+	EnsureJumpInputMapping();
 }
 
 void ACombatCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+
+	// Reliable Space jump even when Enhanced Input / IMC_Combat omit Jump
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		if (PC->WasInputKeyJustPressed(EKeys::SpaceBar) || PC->WasInputKeyJustPressed(EKeys::Gamepad_FaceButton_Bottom))
+		{
+			JumpPressed();
+		}
+		if (PC->WasInputKeyJustReleased(EKeys::SpaceBar) || PC->WasInputKeyJustReleased(EKeys::Gamepad_FaceButton_Bottom))
+		{
+			JumpReleased();
+		}
+	}
 
 	if (CameraBoom)
 	{
@@ -609,7 +625,7 @@ void ACombatCharacter::JumpReleased()
 
 void ACombatCharacter::EnsureJumpInputMapping()
 {
-	// Always resolve the action so BindAction can run even before the local subsystem exists
+	// Prefer project IA_Jump; otherwise own a runtime action (Content/Input may be missing)
 	if (!JumpAction)
 	{
 		JumpAction = LoadObject<UInputAction>(nullptr, TEXT("/Game/Input/Actions/IA_Jump.IA_Jump"));
@@ -619,6 +635,9 @@ void ACombatCharacter::EnsureJumpInputMapping()
 		JumpAction = NewObject<UInputAction>(this, TEXT("RuntimeJumpAction"));
 		JumpAction->ValueType = EInputActionValueType::Boolean;
 	}
+
+	GetCharacterMovement()->NavAgentProps.bCanJump = true;
+	GetCharacterMovement()->JumpZVelocity = FMath::Max(GetCharacterMovement()->JumpZVelocity, 700.0f);
 
 	APlayerController* PC = Cast<APlayerController>(GetController());
 	if (!PC || !PC->IsLocalController())

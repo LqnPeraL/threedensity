@@ -89,6 +89,12 @@ void ACombatPlayerController::SetupInputComponent()
 		EscapeBind.bExecuteWhenPaused = true;
 		FInputKeyBinding& StartBind = InputComponent->BindKey(EKeys::Gamepad_Special_Right, IE_Pressed, this, &ACombatPlayerController::TogglePauseMenu);
 		StartBind.bExecuteWhenPaused = true;
+
+		// Space jump at controller level (IMC_Combat has no Jump mapping)
+		InputComponent->BindKey(EKeys::SpaceBar, IE_Pressed, this, &ACombatPlayerController::JumpPressed);
+		InputComponent->BindKey(EKeys::SpaceBar, IE_Released, this, &ACombatPlayerController::JumpReleased);
+		InputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Pressed, this, &ACombatPlayerController::JumpPressed);
+		InputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Released, this, &ACombatPlayerController::JumpReleased);
 	}
 }
 
@@ -141,6 +147,26 @@ void ACombatPlayerController::ApplyMenuInputMode()
 	SetInputMode(GameOnly);
 }
 
+void ACombatPlayerController::JumpPressed()
+{
+	if (bPauseMenuOpen)
+	{
+		return;
+	}
+	if (ACombatCharacter* CombatPawn = Cast<ACombatCharacter>(GetPawn()))
+	{
+		CombatPawn->JumpPressed();
+	}
+}
+
+void ACombatPlayerController::JumpReleased()
+{
+	if (ACombatCharacter* CombatPawn = Cast<ACombatCharacter>(GetPawn()))
+	{
+		CombatPawn->JumpReleased();
+	}
+}
+
 void ACombatPlayerController::SetMenuTab(int32 NewTab)
 {
 	MenuTab = NewTab;
@@ -165,7 +191,7 @@ FText ACombatPlayerController::GetCurrentTipText() const
 	case 1:
 		return FText::FromString(TEXT("Left click chains a combo. Hold right click to charge a heavy strike."));
 	case 2:
-		return FText::FromString(TEXT("Space jumps. Q swaps camera shoulder. Mouse wheel zooms. Watch the lava — it kills."));
+		return FText::FromString(TEXT("Space jumps. Your sensei waits near the start. Q swaps camera shoulder. Mouse wheel zooms."));
 	default:
 		return FText::FromString(TEXT("Press ESC anytime for the full control cookbook and graphics settings."));
 	}
