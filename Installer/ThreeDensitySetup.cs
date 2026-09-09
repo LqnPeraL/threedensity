@@ -46,20 +46,28 @@ public sealed class LauncherForm : Form
 
     string statusText = "Starting…";
     string versionText = "";
+    string releaseNotesText = "";
+    string installedVersion = "";
+    string latestVersion = "";
     int progressPercent;
     float shimmer;
     bool busy;
     bool showOffline;
     bool showRetry;
+    bool showUpdatePrompt;
+    bool showPlay;
     bool canOffline;
     string launchPath;
+    ReleaseInfo pendingRelease;
 
     Rectangle closeRect;
     Rectangle minRect;
     Rectangle playRect;
     Rectangle retryRect;
+    Rectangle installRect;
+    Rectangle notesRect;
     Rectangle progressTrack;
-    int hoverChrome; // 0 none, 1 min, 2 close, 3 play, 4 retry
+    int hoverChrome; // 0 none, 1 min, 2 close, 3 play, 4 retry, 5 install
     Point dragOrigin;
     bool dragging;
 
@@ -133,7 +141,13 @@ public sealed class LauncherForm : Form
         minRect = new Rectangle(ClientSize.Width - 92, 14, 34, 28);
         progressTrack = new Rectangle(48, ClientSize.Height - 118, ClientSize.Width - 96, 10);
         playRect = new Rectangle(48, ClientSize.Height - 78, 188, 44);
+        installRect = new Rectangle(48, ClientSize.Height - 78, 220, 44);
         retryRect = new Rectangle(248, ClientSize.Height - 78, 140, 44);
+        notesRect = new Rectangle(48, ClientSize.Height - 250, ClientSize.Width - 96, 110);
+        if (showUpdatePrompt)
+        {
+            playRect = new Rectangle(280, ClientSize.Height - 78, 188, 44);
+        }
     }
 
     protected override void OnResize(EventArgs e)
@@ -215,6 +229,11 @@ public sealed class LauncherForm : Form
                 g.DrawString(versionText.ToUpperInvariant(), font, brush, 52, copyTop + 26);
         }
 
+        if (showUpdatePrompt && !string.IsNullOrEmpty(releaseNotesText))
+        {
+            DrawReleaseNotes(g);
+        }
+
         // Status panel
         var statusBox = new Rectangle(48, bounds.Height - 168, bounds.Width - 96, 36);
         using (var font = new Font("Segoe UI", 10.5f))
@@ -225,7 +244,8 @@ public sealed class LauncherForm : Form
         }
 
         DrawProgress(g);
-        if (showOffline) DrawActionButton(g, playRect, "PLAY OFFLINE", hoverChrome == 3, true);
+        if (showUpdatePrompt) DrawActionButton(g, installRect, "INSTALL UPDATE", hoverChrome == 5, true);
+        if (showPlay || showOffline) DrawActionButton(g, playRect, showUpdatePrompt ? "PLAY CURRENT" : (showOffline ? "PLAY OFFLINE" : "PLAY"), hoverChrome == 3, !showUpdatePrompt);
         if (showRetry) DrawActionButton(g, retryRect, "RETRY", hoverChrome == 4, false);
 
         // Outer frame
@@ -233,6 +253,29 @@ public sealed class LauncherForm : Form
             g.DrawRectangle(frame, 0, 0, bounds.Width - 1, bounds.Height - 1);
         using (var inner = new Pen(Color.FromArgb(40, Ember), 1f))
             g.DrawRectangle(inner, 1, 1, bounds.Width - 3, bounds.Height - 3);
+    }
+
+    void DrawReleaseNotes(Graphics g)
+    {
+        using (var path = Rounded(notesRect, 6))
+        using (var fill = new SolidBrush(Color.FromArgb(170, 12, 12, 14)))
+        using (var pen = new Pen(Color.FromArgb(70, Ember), 1f))
+        {
+            g.FillPath(fill, path);
+            g.DrawPath(pen, path);
+        }
+
+        using (var titleFont = new Font("Segoe UI", 9f, FontStyle.Bold))
+        using (var titleBrush = new SolidBrush(Ember))
+            g.DrawString("UPDATE AVAILABLE — WHAT'S NEW", titleFont, titleBrush, notesRect.X + 12, notesRect.Y + 8);
+
+        var bodyRect = new Rectangle(notesRect.X + 12, notesRect.Y + 28, notesRect.Width - 24, notesRect.Height - 36);
+        using (var font = new Font("Segoe UI", 9f))
+        using (var brush = new SolidBrush(Steel))
+        {
+            var sf = new StringFormat { Trimming = StringTrimming.EllipsisWord };
+            g.DrawString(releaseNotesText ?? "", font, brush, bodyRect, sf);
+        }
     }
 
     void DrawChromeButtons(Graphics g)
@@ -368,7 +411,8 @@ public sealed class LauncherForm : Form
 
         if (closeRect.Contains(e.Location)) { Close(); return; }
         if (minRect.Contains(e.Location)) { WindowState = FormWindowState.Minimized; return; }
-        if (showOffline && playRect.Contains(e.Location)) { LaunchGameAndExit(); return; }
+        if (showUpdatePrompt && installRect.Contains(e.Location)) { BeginInstallUpdate(); return; }
+        if ((showPlay || showOffline) && playRect.Contains(e.Location)) { LaunchGameAndExit(); return; }
         if (showRetry && retryRect.Contains(e.Location)) { BeginBootstrap(); return; }
 
         dragging = true;
@@ -388,8 +432,9 @@ public sealed class LauncherForm : Form
         int next = 0;
         if (minRect.Contains(e.Location)) next = 1;
         else if (closeRect.Contains(e.Location)) next = 2;
-        else if (showOffline && playRect.Contains(e.Location)) next = 3;
+        else if ((showPlay || showOffline) && playRect.Contains(e.Location)) next = 3;
         else if (showRetry && retryRect.Contains(e.Location)) next = 4;
+        else if (showUpdatePrompt && installRect.Contains(e.Location)) next = 5;
 
         if (next != hoverChrome)
         {
@@ -422,7 +467,12 @@ public sealed class LauncherForm : Form
         busy = true;
         showOffline = false;
         showRetry = false;
+        showUpdatePrompt = false;
+        showPlay = false;
+        releaseNotesText = "";
+        pendingRelease = null;
         progressPercent = 0;
+        LayoutChrome();
         Invalidate();
 
         ThreadPool.QueueUserWorkItem(state =>
@@ -437,45 +487,55 @@ public sealed class LauncherForm : Form
 
                 SetStatus("Checking GitHub for updates…", 10);
                 ReleaseInfo release = FetchLatestRelease();
-                string installed = ReadInstalledVersion();
+                pendingRelease = release;
+                installedVersion = ReadInstalledVersion();
+                latestVersion = release.Tag ?? "";
                 launchPath = FindExe(gameDir);
-                UiSetVersion(string.IsNullOrEmpty(installed) ? release.Tag : installed);
+                RefreshVersionLabel();
 
                 bool needsInstall = string.IsNullOrEmpty(launchPath) || !File.Exists(launchPath);
-                bool needsUpdate = needsInstall || !VersionsEqual(installed, release.Tag);
+                bool needsUpdate = needsInstall || !VersionsEqual(installedVersion, release.Tag);
+
+                if (needsInstall)
+                {
+                    // First-time install: download automatically
+                    RunInstall(release, true);
+                    Invoke(new Action(() =>
+                    {
+                        busy = false;
+                        showPlay = true;
+                        LayoutChrome();
+                        SetStatus("Installed " + release.Tag + ". Ready to play.", 100);
+                        Invalidate();
+                    }));
+                    return;
+                }
 
                 if (needsUpdate)
                 {
-                    if (needsInstall)
-                        SetStatus("Downloading Three Density " + release.Tag + "…", 15);
-                    else
-                        SetStatus("Update found: " + release.Tag + " · downloading…", 15);
-
-                    string zipUrl = string.IsNullOrEmpty(release.ZipUrl) ? FallbackZip : release.ZipUrl;
-                    string zipPath = Path.Combine(installRoot, "ThreeDensity-Win64.zip");
-                    Download(zipUrl, zipPath);
-
-                    SetStatus("Installing " + release.Tag + "…", 82);
-                    InstallGameFromZip(zipPath);
-                    try { File.Delete(zipPath); } catch { }
-
-                    launchPath = FindExe(gameDir);
-                    if (string.IsNullOrEmpty(launchPath) || !File.Exists(launchPath))
-                        throw new InvalidOperationException("Install finished but threedensity.exe was not found.");
-
-                    File.WriteAllText(versionFile, release.Tag ?? "");
-                    UiSetVersion(release.Tag);
-                    TryRefreshLauncher(release.SetupUrl);
-                    EnsureInstalledLauncherAndShortcuts();
-                    SetStatus("Updated to " + release.Tag + ". Launching…", 96);
+                    string notes = FormatReleaseNotes(release);
+                    Invoke(new Action(() =>
+                    {
+                        busy = false;
+                        showUpdatePrompt = true;
+                        showPlay = true;
+                        releaseNotesText = notes;
+                        LayoutChrome();
+                        SetStatus("Update available: " + installedVersion + " → " + release.Tag, 100);
+                        Invalidate();
+                    }));
+                    return;
                 }
-                else
+
+                Invoke(new Action(() =>
                 {
-                    SetStatus("Up to date (" + installed + "). Launching…", 90);
-                }
-
-                Thread.Sleep(450);
-                Invoke(new Action(LaunchGameAndExit));
+                    busy = false;
+                    showPlay = true;
+                    showUpdatePrompt = false;
+                    LayoutChrome();
+                    SetStatus("Up to date (" + installedVersion + ").", 100);
+                    Invalidate();
+                }));
             }
             catch (Exception ex)
             {
@@ -487,10 +547,121 @@ public sealed class LauncherForm : Form
                     busy = false;
                     showRetry = true;
                     showOffline = canOffline;
+                    showPlay = canOffline;
+                    showUpdatePrompt = false;
+                    LayoutChrome();
                     Invalidate();
                 }));
             }
         });
+    }
+
+    void BeginInstallUpdate()
+    {
+        if (busy || pendingRelease == null) return;
+        busy = true;
+        showUpdatePrompt = false;
+        showPlay = false;
+        showRetry = false;
+        progressPercent = 0;
+        LayoutChrome();
+        Invalidate();
+
+        ReleaseInfo release = pendingRelease;
+        ThreadPool.QueueUserWorkItem(state =>
+        {
+            try
+            {
+                RunInstall(release, false);
+                Invoke(new Action(() =>
+                {
+                    busy = false;
+                    showPlay = true;
+                    showUpdatePrompt = false;
+                    LayoutChrome();
+                    SetStatus("Updated to " + release.Tag + ". Ready to play.", 100);
+                    Invalidate();
+                }));
+            }
+            catch (Exception ex)
+            {
+                launchPath = FindExe(gameDir);
+                canOffline = !string.IsNullOrEmpty(launchPath) && File.Exists(launchPath);
+                SetStatus("Update failed: " + ex.Message, 0);
+                Invoke(new Action(() =>
+                {
+                    busy = false;
+                    showRetry = true;
+                    showPlay = canOffline;
+                    showUpdatePrompt = pendingRelease != null;
+                    LayoutChrome();
+                    Invalidate();
+                }));
+            }
+        });
+    }
+
+    void RunInstall(ReleaseInfo release, bool firstInstall)
+    {
+        if (firstInstall)
+            SetStatus("Downloading Three Density " + release.Tag + "…", 15);
+        else
+            SetStatus("Downloading update " + release.Tag + "…", 15);
+
+        string zipUrl = string.IsNullOrEmpty(release.ZipUrl) ? FallbackZip : release.ZipUrl;
+        string zipPath = Path.Combine(installRoot, "ThreeDensity-Win64.zip");
+        Download(zipUrl, zipPath);
+
+        SetStatus("Installing " + release.Tag + "…", 82);
+        InstallGameFromZip(zipPath);
+        try { File.Delete(zipPath); } catch { }
+
+        launchPath = FindExe(gameDir);
+        if (string.IsNullOrEmpty(launchPath) || !File.Exists(launchPath))
+            throw new InvalidOperationException("Install finished but threedensity.exe was not found.");
+
+        File.WriteAllText(versionFile, release.Tag ?? "");
+        installedVersion = release.Tag ?? "";
+        latestVersion = installedVersion;
+        RefreshVersionLabel();
+        TryRefreshLauncher(release.SetupUrl);
+        EnsureInstalledLauncherAndShortcuts();
+    }
+
+    void RefreshVersionLabel()
+    {
+        string label;
+        if (!string.IsNullOrEmpty(installedVersion) && !string.IsNullOrEmpty(latestVersion)
+            && !VersionsEqual(installedVersion, latestVersion))
+        {
+            label = "Installed " + installedVersion + "  ·  Latest " + latestVersion;
+        }
+        else if (!string.IsNullOrEmpty(installedVersion))
+        {
+            label = "Build " + installedVersion;
+        }
+        else if (!string.IsNullOrEmpty(latestVersion))
+        {
+            label = "Latest " + latestVersion;
+        }
+        else
+        {
+            label = "";
+        }
+
+        UiSetVersionRaw(label);
+    }
+
+    static string FormatReleaseNotes(ReleaseInfo release)
+    {
+        var sb = new System.Text.StringBuilder();
+        if (!string.IsNullOrEmpty(release.Name) && !string.Equals(release.Name, release.Tag, StringComparison.OrdinalIgnoreCase))
+            sb.AppendLine(release.Name);
+        sb.AppendLine("Release " + (release.Tag ?? ""));
+        sb.AppendLine();
+        string body = string.IsNullOrWhiteSpace(release.Body) ? "No release notes on GitHub for this build." : release.Body.Trim();
+        sb.Append(body);
+        return sb.ToString();
     }
 
     void EnsureInstalledLauncherAndShortcuts()
@@ -611,6 +782,8 @@ public sealed class LauncherForm : Form
     sealed class ReleaseInfo
     {
         public string Tag;
+        public string Name;
+        public string Body;
         public string ZipUrl;
         public string SetupUrl;
     }
@@ -627,11 +800,32 @@ public sealed class LauncherForm : Form
             Match tag = Regex.Match(json, "\"tag_name\"\\s*:\\s*\"([^\"]+)\"");
             if (tag.Success) info.Tag = tag.Groups[1].Value;
 
+            // Parse release title/body from the release object (after tag_name), not nested asset fields
+            int tagPos = json.IndexOf("\"tag_name\"", StringComparison.OrdinalIgnoreCase);
+            string releaseSlice = tagPos >= 0 ? json.Substring(tagPos) : json;
+            Match name = Regex.Match(releaseSlice, "\"name\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
+            if (name.Success) info.Name = UnescapeJson(name.Groups[1].Value);
+            Match body = Regex.Match(releaseSlice, "\"body\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
+            if (body.Success) info.Body = UnescapeJson(body.Groups[1].Value);
+
             info.ZipUrl = FindAssetUrl(json, "ThreeDensity-Win64.zip") ?? FallbackZip;
             info.SetupUrl = FindAssetUrl(json, "ThreeDensitySetup.exe") ?? FallbackSetup;
             if (string.IsNullOrEmpty(info.Tag)) info.Tag = "latest";
             return info;
         }
+    }
+
+    static string UnescapeJson(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return "";
+        return s
+            .Replace("\\r\\n", "\n")
+            .Replace("\\n", "\n")
+            .Replace("\\r", "\n")
+            .Replace("\\t", "  ")
+            .Replace("\\\"", "\"")
+            .Replace("\\/", "/")
+            .Replace("\\\\", "\\");
     }
 
     static string FindAssetUrl(string json, string fileName)
@@ -705,14 +899,21 @@ public sealed class LauncherForm : Form
 
     void UiSetVersion(string tag)
     {
+        UiSetVersionRaw(string.IsNullOrEmpty(tag) ? "" : ("Build " + tag));
+    }
+
+    void UiSetVersionRaw(string label)
+    {
         if (IsDisposed) return;
+        Action apply = () =>
+        {
+            versionText = label ?? "";
+            Invalidate();
+        };
         try
         {
-            Invoke(new Action(() =>
-            {
-                versionText = string.IsNullOrEmpty(tag) ? "" : ("Build " + tag);
-                Invalidate();
-            }));
+            if (InvokeRequired) Invoke(apply);
+            else apply();
         }
         catch { }
     }
@@ -720,14 +921,16 @@ public sealed class LauncherForm : Form
     void SetStatus(string text, int percent)
     {
         if (IsDisposed) return;
+        Action apply = () =>
+        {
+            statusText = text;
+            progressPercent = Math.Max(0, Math.Min(100, percent));
+            Invalidate();
+        };
         try
         {
-            Invoke(new Action(() =>
-            {
-                statusText = text;
-                progressPercent = Math.Max(0, Math.Min(100, percent));
-                Invalidate();
-            }));
+            if (InvokeRequired) Invoke(apply);
+            else apply();
         }
         catch { }
     }

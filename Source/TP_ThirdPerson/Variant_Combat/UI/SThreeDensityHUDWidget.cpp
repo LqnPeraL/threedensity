@@ -17,6 +17,10 @@
 #include "Widgets/Images/SImage.h"
 #include "ThreeDensityLogo.h"
 #include "Engine/Engine.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "HAL/PlatformMisc.h"
+#include "Misc/ConfigCacheIni.h"
 
 namespace
 {
@@ -480,6 +484,17 @@ TSharedRef<SWidget> SThreeDensityHUDWidget::BuildSettingsPanel()
 		[ SNew(SButton).OnClicked(this, &SThreeDensityHUDWidget::OnDisplayMode, 1).ButtonColorAndOpacity(IdleBtn)[Label(TEXT("BORDERLESS"), 12)] ]
 		+ SHorizontalBox::Slot().AutoWidth()
 		[ SNew(SButton).OnClicked(this, &SThreeDensityHUDWidget::OnDisplayMode, 2).ButtonColorAndOpacity(IdleBtn)[Label(TEXT("WINDOWED"), 12)] ]
+	]
+	+ SVerticalBox::Slot().AutoHeight().Padding(0, 20, 0, 0)
+	[
+		Label(TEXT("BUILD"), 13, Muted)
+	]
+	+ SVerticalBox::Slot().AutoHeight().Padding(0, 6, 0, 0)
+	[
+		SNew(STextBlock)
+		.Text(this, &SThreeDensityHUDWidget::GetBuildVersionText)
+		.Font(FCoreStyle::GetDefaultFontStyle("Bold", 13))
+		.ColorAndOpacity(Ember)
 	];
 }
 
@@ -757,6 +772,34 @@ FText SThreeDensityHUDWidget::GetResolutionLabel() const
 			FMath::RoundToInt(S->GetResolutionScaleNormalized() * 100.f)));
 	}
 	return FText::FromString(TEXT("3D resolution scale"));
+}
+
+FText SThreeDensityHUDWidget::GetBuildVersionText() const
+{
+	FString Tag;
+
+	const FString VersionPath = FPaths::Combine(
+		FPlatformMisc::GetEnvironmentVariable(TEXT("LOCALAPPDATA")),
+		TEXT("ThreeDensity"),
+		TEXT("version.txt"));
+	if (FPaths::FileExists(VersionPath))
+	{
+		FFileHelper::LoadFileToString(Tag, *VersionPath);
+		Tag.TrimStartAndEndInline();
+	}
+
+	if (Tag.IsEmpty() && GConfig)
+	{
+		GConfig->GetString(TEXT("/Script/EngineSettings.GeneralProjectSettings"), TEXT("ProjectVersion"), Tag, GGameIni);
+		Tag.TrimStartAndEndInline();
+	}
+
+	if (Tag.IsEmpty())
+	{
+		Tag = TEXT("dev");
+	}
+
+	return FText::FromString(FString::Printf(TEXT("Build %s"), *Tag));
 }
 
 FSlateColor SThreeDensityHUDWidget::NavColor(int32 Tab) const

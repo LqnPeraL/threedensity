@@ -55,6 +55,7 @@ private:
 	FText GetVSyncLabel() const;
 	FText GetFpsLabel() const;
 	FText GetResolutionLabel() const;
+	FText GetBuildVersionText() const;
 	TOptional<float> GetHealthPercent() const;
 
 	FSlateColor NavColor(int32 Tab) const;
