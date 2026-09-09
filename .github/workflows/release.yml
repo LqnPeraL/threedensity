@@ -77,7 +77,7 @@ jobs:
           @"
           Auto-release for commit ``$env:GITHUB_SHA``
 
-          - Site: https://lqnpereal.github.io/threedensity/
+          - Site: https://LqnPeraL.github.io/threedensity/
           - Download **ThreeDensitySetup.exe** from this release to install/update and play.
           - To ship your cooked game for a commit, add ``release-assets/ThreeDensity-Win64.zip`` before pushing (see ``scripts/package-win64.ps1``).
           "@ | Set-Content -Encoding utf8 release-notes.md

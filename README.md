@@ -10,7 +10,9 @@ Third-person combat action. Fight through enemy pressure, master combos and char
 
 The launcher installs the game, creates a desktop shortcut, and **checks GitHub for updates on every launch** before starting.
 
-Game page: **[lqnpereal.github.io/threedensity](https://lqnpereal.github.io/threedensity/)**
+Game page: **[Open site](https://cdn.jsdelivr.net/gh/LqnPeraL/threedensity@main/docs/)** · GitHub Pages: [LqnPeraL.github.io/threedensity](https://LqnPeraL.github.io/threedensity/)
+
+> Note: all-lowercase `lqnpereal.github.io` currently 404s (GitHub Host routing). Use the CDN link above, or the mixed-case Pages URL. Renaming the GitHub user to all-lowercase fixes Pages in normal browsers.
 
 Portable ZIP (optional): [ThreeDensity-Win64.zip](https://github.com/LqnPeraL/threedensity/releases/latest/download/ThreeDensity-Win64.zip)
 

@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure Pages
+      - name: Setup Pages (docs folder)
         uses: actions/configure-pages@v5
 
       - name: Upload docs site
