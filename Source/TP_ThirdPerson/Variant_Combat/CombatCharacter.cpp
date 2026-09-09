@@ -10,6 +10,8 @@
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedInputComponent.h"
+#include "InputMappingContext.h"
+#include "InputAction.h"
 #include "CombatLifeBar.h"
 #include "Engine/DamageEvents.h"
 #include "TimerManager.h"
@@ -17,6 +19,7 @@
 #include "CombatPlayerController.h"
 #include "InputCoreTypes.h"
 #include "Components/InputComponent.h"
+#include "GameFramework/PlayerController.h"
 
 ACombatCharacter::ACombatCharacter()
 {
@@ -30,6 +33,9 @@ ACombatCharacter::ACombatCharacter()
 
 	// Configure character movement
 	GetCharacterMovement()->MaxWalkSpeed = 400.0f;
+	GetCharacterMovement()->JumpZVelocity = 700.0f;
+	GetCharacterMovement()->AirControl = 0.35f;
+	GetCharacterMovement()->NavAgentProps.bCanJump = true;
 
 	// create the camera boom
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
@@ -588,9 +594,68 @@ void ACombatCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	GetWorld()->GetTimerManager().ClearTimer(RespawnTimer);
 }
 
+void ACombatCharacter::JumpPressed()
+{
+	if (CurrentHP > 0.0f)
+	{
+		Jump();
+	}
+}
+
+void ACombatCharacter::JumpReleased()
+{
+	StopJumping();
+}
+
+void ACombatCharacter::EnsureJumpInputMapping()
+{
+	// Always resolve the action so BindAction can run even before the local subsystem exists
+	if (!JumpAction)
+	{
+		JumpAction = LoadObject<UInputAction>(nullptr, TEXT("/Game/Input/Actions/IA_Jump.IA_Jump"));
+	}
+	if (!JumpAction)
+	{
+		JumpAction = NewObject<UInputAction>(this, TEXT("RuntimeJumpAction"));
+		JumpAction->ValueType = EInputActionValueType::Boolean;
+	}
+
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC || !PC->IsLocalController())
+	{
+		return;
+	}
+
+	ULocalPlayer* LocalPlayer = PC->GetLocalPlayer();
+	if (!LocalPlayer)
+	{
+		return;
+	}
+
+	UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(LocalPlayer);
+	if (!Subsystem)
+	{
+		return;
+	}
+
+	if (!JumpMappingContext)
+	{
+		JumpMappingContext = NewObject<UInputMappingContext>(this, TEXT("RuntimeJumpIMC"));
+		JumpMappingContext->MapKey(JumpAction, EKeys::SpaceBar);
+		JumpMappingContext->MapKey(JumpAction, EKeys::Gamepad_FaceButton_Bottom);
+	}
+
+	// Priority above default combat IMC so Space always reaches jump
+	Subsystem->RemoveMappingContext(JumpMappingContext);
+	Subsystem->AddMappingContext(JumpMappingContext, 1);
+}
+
 void ACombatCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+	// Make sure Space is mapped before binding the jump action
+	EnsureJumpInputMapping();
 
 	// Set up action bindings
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
@@ -604,8 +669,8 @@ void ACombatCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 
 		if (JumpAction)
 		{
-			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
-			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
+			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACombatCharacter::JumpPressed);
+			EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACombatCharacter::JumpReleased);
 		}
 
 		// Combo Attack
@@ -619,11 +684,11 @@ void ACombatCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EnhancedInputComponent->BindAction(ToggleCameraAction, ETriggerEvent::Triggered, this, &ACombatCharacter::ToggleCamera);
 	}
 
-	// Jump — Space / gamepad A (IMC_Combat has no IA_Jump mapping; bind keys like zoom)
-	PlayerInputComponent->BindKey(EKeys::SpaceBar, IE_Pressed, this, &ACharacter::Jump);
-	PlayerInputComponent->BindKey(EKeys::SpaceBar, IE_Released, this, &ACharacter::StopJumping);
-	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Pressed, this, &ACharacter::Jump);
-	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Released, this, &ACharacter::StopJumping);
+	// Legacy key fallback (same pattern as zoom / pause)
+	PlayerInputComponent->BindKey(EKeys::SpaceBar, IE_Pressed, this, &ACombatCharacter::JumpPressed);
+	PlayerInputComponent->BindKey(EKeys::SpaceBar, IE_Released, this, &ACombatCharacter::JumpReleased);
+	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Pressed, this, &ACombatCharacter::JumpPressed);
+	PlayerInputComponent->BindKey(EKeys::Gamepad_FaceButton_Bottom, IE_Released, this, &ACombatCharacter::JumpReleased);
 
 	// Zoom — mouse wheel + keyboard (works alongside Enhanced Input)
 	PlayerInputComponent->BindAxisKey(EKeys::MouseWheelAxis, this, &ACombatCharacter::ZoomAxis);
@@ -638,6 +703,8 @@ void ACombatCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 void ACombatCharacter::NotifyControllerChanged()
 {
 	Super::NotifyControllerChanged();
+
+	EnsureJumpInputMapping();
 
 	// update the respawn transform on the Player Controller
 	if (ACombatPlayerController* PC = Cast<ACombatPlayerController>(GetController()))

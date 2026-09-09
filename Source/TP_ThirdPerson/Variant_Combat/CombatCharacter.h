@@ -12,6 +12,7 @@
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
+class UInputMappingContext;
 struct FInputActionValue;
 class UCombatLifeBar;
 class UWidgetComponent;
@@ -72,6 +73,10 @@ protected:
 	/** Toggle Camera Side Input Action */
 	UPROPERTY(EditAnywhere, Category ="Input")
 	UInputAction* ToggleCameraAction;
+
+	/** Runtime IMC that maps Space / gamepad face button to JumpAction (IMC_Combat has no Jump) */
+	UPROPERTY(Transient)
+	TObjectPtr<UInputMappingContext> JumpMappingContext;
 
 	/** Max amount of HP the character will have on respawn */
 	UPROPERTY(EditAnywhere, Category="Damage", meta = (ClampMin = 0, ClampMax = 100))
@@ -374,6 +379,15 @@ protected:
 
 	/** Handles possessed initialization */
 	virtual void NotifyControllerChanged() override;
+
+	/** Maps Space / gamepad A onto JumpAction through Enhanced Input */
+	void EnsureJumpInputMapping();
+
+	/** Space / jump pressed */
+	void JumpPressed();
+
+	/** Space / jump released */
+	void JumpReleased();
 
 public:
 
