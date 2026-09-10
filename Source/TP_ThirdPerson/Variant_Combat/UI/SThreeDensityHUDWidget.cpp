@@ -776,7 +776,7 @@ FText SThreeDensityHUDWidget::GetResolutionLabel() const
 
 FText SThreeDensityHUDWidget::GetBuildVersionText() const
 {
-	FString Tag;
+	FString VersionTag;
 
 	const FString VersionPath = FPaths::Combine(
 		FPlatformMisc::GetEnvironmentVariable(TEXT("LOCALAPPDATA")),
@@ -784,22 +784,22 @@ FText SThreeDensityHUDWidget::GetBuildVersionText() const
 		TEXT("version.txt"));
 	if (FPaths::FileExists(VersionPath))
 	{
-		FFileHelper::LoadFileToString(Tag, *VersionPath);
-		Tag.TrimStartAndEndInline();
+		FFileHelper::LoadFileToString(VersionTag, *VersionPath);
+		VersionTag.TrimStartAndEndInline();
 	}
 
-	if (Tag.IsEmpty() && GConfig)
+	if (VersionTag.IsEmpty() && GConfig)
 	{
-		GConfig->GetString(TEXT("/Script/EngineSettings.GeneralProjectSettings"), TEXT("ProjectVersion"), Tag, GGameIni);
-		Tag.TrimStartAndEndInline();
+		GConfig->GetString(TEXT("/Script/EngineSettings.GeneralProjectSettings"), TEXT("ProjectVersion"), VersionTag, GGameIni);
+		VersionTag.TrimStartAndEndInline();
 	}
 
-	if (Tag.IsEmpty())
+	if (VersionTag.IsEmpty())
 	{
-		Tag = TEXT("dev");
+		VersionTag = TEXT("dev");
 	}
 
-	return FText::FromString(FString::Printf(TEXT("Build %s"), *Tag));
+	return FText::FromString(FString::Printf(TEXT("Build %s"), *VersionTag));
 }
 
 FSlateColor SThreeDensityHUDWidget::NavColor(int32 Tab) const

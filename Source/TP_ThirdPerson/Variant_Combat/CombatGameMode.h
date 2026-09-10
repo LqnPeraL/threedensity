@@ -28,7 +28,7 @@ protected:
 
 	/** Offset from PlayerStart: forward, right, up (cm) */
 	UPROPERTY(EditAnywhere, Category = "Sensei")
-	FVector SenseiSpawnOffset = FVector(280.0f, 160.0f, 0.0f);
+	FVector SenseiSpawnOffset = FVector(220.0f, 120.0f, 0.0f);
 
 	UPROPERTY(Transient)
 	TObjectPtr<ACombatSensei> SpawnedSensei;

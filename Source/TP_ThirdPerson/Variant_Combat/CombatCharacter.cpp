@@ -612,9 +612,31 @@ void ACombatCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void ACombatCharacter::JumpPressed()
 {
-	if (CurrentHP > 0.0f)
+	if (CurrentHP <= 0.0f)
+	{
+		return;
+	}
+
+	// Ensure movement still allows jumping (Blueprint defaults can clear this)
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		MoveComp->NavAgentProps.bCanJump = true;
+		MoveComp->JumpZVelocity = FMath::Max(MoveComp->JumpZVelocity, 700.0f);
+	}
+
+	if (CanJump())
 	{
 		Jump();
+		return;
+	}
+
+	// Grounded fallback if CanJump was blocked by montage / transient state
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		if (MoveComp->IsMovingOnGround())
+		{
+			LaunchCharacter(FVector(0.0f, 0.0f, MoveComp->JumpZVelocity), false, true);
+		}
 	}
 }
 
